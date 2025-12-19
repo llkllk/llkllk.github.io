@@ -26,7 +26,8 @@
   // 设置 iframe 源地址
   var targetUrl = getUrlParameter('url') || 'https://yidev.cn';
 
-  $("#Zl").html('<iframe width="100%" id="preview" name="contentFrame" src="' + targetUrl + '" frameborder="0" sandbox="allow-same-origin allow-scripts allow-forms allow-popups-to-escape-sandbox"></iframe>');
+  // 注意：移除 allow-popups-to-escape-sandbox，改为 allow-popups 让弹窗保持在 iframe 内
+  $("#Zl").html('<iframe width="100%" id="preview" name="contentFrame" src="' + targetUrl + '" frameborder="0" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>');
 
   $(document).ready(function(){
     function fix_height(){
@@ -35,7 +36,44 @@
     $(window).resize(function(){
       fix_height();
     }).resize();
-    $("#preview")[0].contentWindow.focus();
+
+    // 尝试拦截 iframe 内的 window.open（仅在同源时有效）
+    var iframe = $("#preview")[0];
+    iframe.onload = function() {
+      try {
+        var iframeWindow = iframe.contentWindow;
+
+        // 保存原始的 window.open
+        var originalOpen = iframeWindow.open;
+
+        // 重写 window.open，强制在 iframe 内打开
+        iframeWindow.open = function(url, name, features) {
+          // 忽略 name 参数，强制在当前窗口打开
+          return iframeWindow.location.href = url;
+        };
+
+        // 拦截所有链接的 target 属性
+        iframeWindow.document.addEventListener('click', function(e) {
+          var target = e.target;
+          if (target.tagName === 'A') {
+            var href = target.getAttribute('href');
+            var linkTarget = target.getAttribute('target');
+
+            // 如果是 _blank, _top, _parent，阻止默认行为并在 iframe 内打开
+            if (linkTarget === '_blank' || linkTarget === '_top' || linkTarget === '_parent') {
+              e.preventDefault();
+              iframeWindow.location.href = href;
+            }
+          }
+        }, true);
+
+      } catch (e) {
+        // 跨域时会报错，这是正常的
+        console.log('无法访问 iframe 内容（跨域限制）:', e.message);
+      }
+    };
+
+    iframe.contentWindow.focus();
   });
 </script>
 </br></br></br>
