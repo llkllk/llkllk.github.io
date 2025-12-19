@@ -26,8 +26,8 @@
   // 设置 iframe 源地址
   var targetUrl = getUrlParameter('url') || 'https://yidev.cn';
 
-  // 注意：移除 allow-popups-to-escape-sandbox，改为 allow-popups 让弹窗保持在 iframe 内
-  $("#Zl").html('<iframe width="100%" id="preview" name="contentFrame" src="' + targetUrl + '" frameborder="0" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>');
+  // 使用 sandbox 但允许导航，只阻止 top-navigation
+  $("#Zl").html('<iframe width="100%" id="preview" name="contentFrame" src="' + targetUrl + '" frameborder="0" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"></iframe>');
 
   $(document).ready(function(){
     function fix_height(){
@@ -37,39 +37,25 @@
       fix_height();
     }).resize();
 
-    // 尝试拦截 iframe 内的 window.open（仅在同源时有效）
+    // 轻量级拦截：只处理跨域情况下的 target="_blank" 链接
     var iframe = $("#preview")[0];
     iframe.onload = function() {
       try {
         var iframeWindow = iframe.contentWindow;
 
-        // 保存原始的 window.open
+        // 只拦截 window.open 打开新窗口的情况
         var originalOpen = iframeWindow.open;
-
-        // 重写 window.open，强制在 iframe 内打开
         iframeWindow.open = function(url, name, features) {
-          // 忽略 name 参数，强制在当前窗口打开
-          return iframeWindow.location.href = url;
-        };
-
-        // 拦截所有链接的 target 属性
-        iframeWindow.document.addEventListener('click', function(e) {
-          var target = e.target;
-          if (target.tagName === 'A') {
-            var href = target.getAttribute('href');
-            var linkTarget = target.getAttribute('target');
-
-            // 如果是 _blank, _top, _parent，阻止默认行为并在 iframe 内打开
-            if (linkTarget === '_blank' || linkTarget === '_top' || linkTarget === '_parent') {
-              e.preventDefault();
-              iframeWindow.location.href = href;
-            }
+          // 如果是打开新窗口（没有 name 或 name 是 _blank），在当前 iframe 内打开
+          if (!name || name === '_blank' || name === '_top' || name === '_parent') {
+            iframeWindow.location.href = url;
+            return null;
           }
-        }, true);
-
+          // 其他情况使用原始行为
+          return originalOpen.call(iframeWindow, url, name, features);
+        };
       } catch (e) {
-        // 跨域时会报错，这是正常的
-        console.log('无法访问 iframe 内容（跨域限制）:', e.message);
+        // 跨域时无法访问，依赖 sandbox 属性限制
       }
     };
 
