@@ -37,25 +37,41 @@
       fix_height();
     }).resize();
 
-    // 轻量级拦截：只处理跨域情况下的 target="_blank" 链接
+    // 在 iframe 加载完成后动态插入 <base target="_self">
     var iframe = $("#preview")[0];
     iframe.onload = function() {
       try {
         var iframeWindow = iframe.contentWindow;
+        var iframeDoc = iframeWindow.document;
 
-        // 只拦截 window.open 打开新窗口的情况
+        // 检查是否已经有 base 标签
+        var existingBase = iframeDoc.querySelector('base');
+        if (existingBase) {
+          // 如果已有 base 标签，修改其 target 属性
+          existingBase.setAttribute('target', '_self');
+        } else {
+          // 如果没有，创建新的 base 标签
+          var base = iframeDoc.createElement('base');
+          base.setAttribute('target', '_self');
+          var head = iframeDoc.head || iframeDoc.getElementsByTagName('head')[0];
+          if (head) {
+            head.insertBefore(base, head.firstChild);
+          }
+        }
+
+        // 同时拦截 window.open
         var originalOpen = iframeWindow.open;
         iframeWindow.open = function(url, name, features) {
-          // 如果是打开新窗口（没有 name 或 name 是 _blank），在当前 iframe 内打开
+          // 如果是打开新窗口，在当前 iframe 内打开
           if (!name || name === '_blank' || name === '_top' || name === '_parent') {
             iframeWindow.location.href = url;
             return null;
           }
-          // 其他情况使用原始行为
           return originalOpen.call(iframeWindow, url, name, features);
         };
       } catch (e) {
         // 跨域时无法访问，依赖 sandbox 属性限制
+        console.log('跨域限制，无法注入 base 标签');
       }
     };
 
