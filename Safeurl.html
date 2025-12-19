@@ -26,7 +26,7 @@
   // 设置 iframe 源地址
   var targetUrl = getUrlParameter('url') || 'https://yidev.cn';
 
-  $("#Zl").html('<iframe width="100%" id="preview" src="' + targetUrl + '" frameborder="0"></iframe>');
+  $("#Zl").html('<iframe width="100%" id="preview" name="contentFrame" src="' + targetUrl + '" frameborder="0" sandbox="allow-same-origin allow-scripts allow-forms allow-popups-to-escape-sandbox"></iframe>');
 
   $(document).ready(function(){
     function fix_height(){
