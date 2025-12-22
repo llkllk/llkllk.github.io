@@ -26,7 +26,9 @@
   // 设置 iframe 源地址
   var targetUrl = getUrlParameter('url') || 'https://yidev.cn';
 
-  $("#Zl").html('<iframe width="100%" id="preview" src="' + targetUrl + '" frameborder="0"></iframe>');
+  // 使用 sandbox 限制：允许弹窗但阻止逃逸到父窗口
+  // 注意：allow-popups 允许 window.open，但不包含 allow-popups-to-escape-sandbox，所以弹窗会留在 iframe 内
+  $("#Zl").html('<iframe width="100%" id="preview" name="contentFrame" src="' + targetUrl + '" frameborder="0" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>');
 
   $(document).ready(function(){
     function fix_height(){
@@ -35,7 +37,42 @@
     $(window).resize(function(){
       fix_height();
     }).resize();
-    $("#preview").contentWindow.focus();
+
+    // 仅对同源内容尝试注入 base 标签
+    var iframe = $("#preview")[0];
+    iframe.onload = function() {
+      try {
+        var iframeWindow = iframe.contentWindow;
+        var iframeDoc = iframeWindow.document;
+
+        // 检查是否已经有 base 标签
+        var existingBase = iframeDoc.querySelector('base');
+        if (existingBase) {
+          existingBase.setAttribute('target', '_self');
+        } else {
+          var base = iframeDoc.createElement('base');
+          base.setAttribute('target', '_self');
+          var head = iframeDoc.head || iframeDoc.getElementsByTagName('head')[0];
+          if (head) {
+            head.insertBefore(base, head.firstChild);
+          }
+        }
+
+        // 拦截 window.open
+        var originalOpen = iframeWindow.open;
+        iframeWindow.open = function(url, name, features) {
+          if (!name || name === '_blank' || name === '_top' || name === '_parent') {
+            iframeWindow.location.href = url;
+            return null;
+          }
+          return originalOpen.call(iframeWindow, url, name, features);
+        };
+      } catch (e) {
+        // 跨域时无法注入，依赖 sandbox 属性阻止弹窗
+      }
+    };
+
+    iframe.contentWindow.focus();
   });
 </script>
 </br></br></br>
